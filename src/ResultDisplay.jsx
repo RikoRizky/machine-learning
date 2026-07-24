@@ -5,7 +5,8 @@ const ResultDisplay = ({ result }) => {
     jk, umur, bb, tb,
     z_bbu, z_tbu, z_bbtb, 
     status_bbu, status_tbu, status_bbtb, 
-    saran 
+    saran,
+    chart_image  
   } = result;
 
   const getStatusClass = (status) => {
@@ -34,7 +35,6 @@ const ResultDisplay = ({ result }) => {
         📊 Hasil Analisis
       </h3>
 
-      {/* Tampilkan data input */}
       <div style={{ 
         background: '#f7fafc', 
         padding: '12px 16px', 
@@ -84,6 +84,20 @@ const ResultDisplay = ({ result }) => {
         <h4 style={{ marginBottom: '8px' }}>💡 Rekomendasi Intervensi</h4>
         <p>{saran}</p>
       </div>
+
+      {/* ===== TAMBAHKAN BAGIAN INI UNTUK GRAFIK ===== */}
+      {chart_image ? (
+        <div style={{ marginTop: '20px', textAlign: 'center' }}>
+          <h4>📈 Diagram Z-Score</h4>
+          <img
+            src={`data:image/png;base64,${chart_image}`}
+            alt="Diagram Z-Score"
+            style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px', border: '1px solid #ddd' }}
+          />
+        </div>
+      ) : (
+        <p style={{ color: '#999', marginTop: '20px' }}>⚠️ Grafik tidak tersedia</p>
+      )}
     </div>
   );
 };
