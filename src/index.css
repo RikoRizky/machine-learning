@@ -237,6 +237,16 @@ hr {
   margin: 30px auto 0;
 }
 
+/* Evaluation Section Enhancement */
+.eval-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: #2b6cb0 !important;
+}
+
+.eval-figure-container img {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
 /* Responsive */
 @media (max-width: 640px) {
   .app-container {
