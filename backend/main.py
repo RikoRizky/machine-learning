@@ -522,20 +522,86 @@ def generate_evaluation_chart(scatter_data, targets_r2, metrics, feat_names, fea
 @app.route('/evaluation', methods=['GET'])
 def evaluation():
     try:
-        # Pemetaan nama indikator WHO & R²
+        # 1. Hitung distribusi outlier secara dinamis dari dataset database (df_ml)
+        if df_ml is not None:
+            z_vals = df_ml[target_kolom].values.astype(float)
+            z_max = np.abs(z_vals).max(axis=1)
+            total_n = int(len(df_ml))
+            norm_cnt = int((z_max <= 3.0).sum())
+            ekstrem_cnt = int(((z_max > 3.0) & (z_max <= 5.0)).sum())
+            anomali_cnt = int((z_max > 5.0).sum())
+        else:
+            total_n = 40071
+            norm_cnt, ekstrem_cnt, anomali_cnt = 34650, 5159, 262
+
+        outlier_distribution = {
+            'total': total_n,
+            'categories': ['Data Normal (|Z| ≤ 3.0)', 'Kasus Ekstrem (3 < |Z| ≤ 5)', 'Outlier Anomali (|Z| > 5.0)'],
+            'counts': [norm_cnt, ekstrem_cnt, anomali_cnt],
+            'labels': [f'{norm_cnt:,} baris', f'{ekstrem_cnt:,} baris', f'{anomali_cnt:,} baris'],
+            'colors': ['#0f766e', '#d97706', '#b91c1c']
+        }
+
+        # 2. Hitung feature importance secara dinamis langsung dari model AI (fitur_kolom & model.feature_importances_)
+        feat_display_map = {
+            'Tinggi (cm)': 'Tinggi Badan (tb)',
+            'Berat (kg)': 'Berat Badan (bb)',
+            'Umur (bln)': 'Umur Bulan (umur)',
+            'JK': 'Jenis Kelamin (jk)'
+        }
+        color_map_b = {
+            'Tinggi Badan (tb)': '#102a43',
+            'Berat Badan (bb)': '#1d70b8',
+            'Umur Bulan (umur)': '#0e7490',
+            'Jenis Kelamin (jk)': '#718096'
+        }
+        if model is not None and hasattr(model, 'feature_importances_'):
+            raw_imp = model.feature_importances_
+            dyn_feats = [feat_display_map.get(f, f) for f in fitur_kolom]
+            dyn_imps = [round(float(v), 4) for v in raw_imp]
+            dyn_pcts = [f'{v * 100:.1f}%' for v in dyn_imps]
+            dyn_colors = [color_map_b.get(f, '#2b6cb0') for f in dyn_feats]
+        else:
+            dyn_feats = ['Tinggi Badan (tb)', 'Berat Badan (bb)', 'Umur Bulan (umur)', 'Jenis Kelamin (jk)']
+            dyn_imps = [0.3623, 0.1926, 0.4078, 0.0374]
+            dyn_pcts = ['36.2%', '19.3%', '40.8%', '3.7%']
+            dyn_colors = [color_map_b.get(f, '#2b6cb0') for f in dyn_feats]
+
+        feature_importance = {
+            'features': dyn_feats,
+            'importances': dyn_imps,
+            'percentages': dyn_pcts,
+            'colors': dyn_colors
+        }
+
+        # 3. Hitung R2 score, RMSE, MAE, dan scatter sample secara dinamis dari df_ml dan y_pred
         target_labels = {
             'Z-score BB/U': 'BB/U (WAZ)',
             'Z-score TB/U': 'TB/U (HAZ)',
             'Z-score BB/TB': 'BB/TB (WHZ)'
         }
-        r2_map = {
-            'BB/U (WAZ)': 0.968,
-            'TB/U (HAZ)': 0.961,
-            'BB/TB (WHZ)': 0.936
+        color_map_targets = {
+            'BB/U (WAZ)': '#4a90e2',
+            'TB/U (HAZ)': '#38b2ac',
+            'BB/TB (WHZ)': '#ed8936'
         }
 
         scatter_data = {}
+        r2_map = {}
         if df_ml is not None and y_pred is not None:
+            # Hitung evaluasi statistik nyata dari seluruh data database df_ml
+            from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+            y_all_true = df_ml[target_kolom].values.astype(float)
+            for i, col in enumerate(target_kolom):
+                lbl = target_labels.get(col, col)
+                r2_val = float(r2_score(y_all_true[:, i], y_pred[:, i]))
+                r2_map[lbl] = round(r2_val, 3)
+
+            mean_r2 = round(float(np.mean(list(r2_map.values()))), 4)
+            rmse = round(float(np.sqrt(mean_squared_error(y_all_true, y_pred))), 4)
+            mae = round(float(mean_absolute_error(y_all_true, y_pred)), 4)
+
+            # Sample 400 titik aktual vs prediksi untuk visualisasi scatter interaktif
             sample_size = min(400, len(df_ml))
             sample_idx = np.random.choice(len(df_ml), size=sample_size, replace=False)
             y_true_s = df_ml[target_kolom].iloc[sample_idx]
@@ -547,6 +613,8 @@ def evaluation():
                     'predicted': [round(float(v), 3) for v in y_pred_s[:, i].tolist()]
                 }
         else:
+            r2_map = {'BB/U (WAZ)': 0.987, 'TB/U (HAZ)': 0.993, 'BB/TB (WHZ)': 0.862}
+            mean_r2, rmse, mae = 0.9472, 1.0991, 0.0463
             np.random.seed(42)
             for lbl in ['BB/U (WAZ)', 'TB/U (HAZ)', 'BB/TB (WHZ)']:
                 acts = np.random.uniform(-4, 3.5, 120).tolist()
@@ -554,25 +622,20 @@ def evaluation():
                 scatter_data[lbl] = {'actual': [round(a, 3) for a in acts], 'predicted': preds}
 
         metrics = {
-            'mean_r2': 0.9552,
-            'rmse': 0.2230,
-            'mae': 0.1360
+            'mean_r2': mean_r2,
+            'rmse': rmse,
+            'mae': mae
         }
 
-        feature_importance = {
-            'features': ['Tinggi Badan (tb)', 'Berat Badan (bb)', 'Umur Bulan (umur)', 'Jenis Kelamin (jk)'],
-            'importances': [0.412, 0.368, 0.174, 0.046],
-            'percentages': ['41.2%', '36.8%', '17.4%', '4.6%'],
-            'colors': ['#102a43', '#1d70b8', '#0e7490', '#718096']
-        }
-
-        outlier_distribution = {
-            'total': 40071,
-            'categories': ['Data Normal (|Z| ≤ 3.0)', 'Kasus Ekstrem (3 < |Z| ≤ 5)', 'Outlier Anomali (|Z| > 5.0)'],
-            'counts': [34650, 5159, 262],
-            'labels': ['34,650 baris', '5,159 baris', '262 baris'],
-            'colors': ['#0f766e', '#d97706', '#b91c1c']
-        }
+        targets_info = [
+            {
+                'name': lbl,
+                'key': col,
+                'r2': r2_map.get(lbl, 0.95),
+                'color': color_map_targets.get(lbl, '#4a90e2')
+            }
+            for col, lbl in target_labels.items()
+        ]
 
         chart_image_b64 = generate_evaluation_chart(
             scatter_data, r2_map, metrics,
@@ -583,11 +646,7 @@ def evaluation():
         return jsonify({
             'metrics': metrics,
             'targets': ['BB/U (WAZ)', 'TB/U (HAZ)', 'BB/TB (WHZ)'],
-            'targets_info': [
-                {'name': 'BB/U (WAZ)', 'key': 'Z-score BB/U', 'r2': 0.968, 'color': '#4a90e2'},
-                {'name': 'TB/U (HAZ)', 'key': 'Z-score TB/U', 'r2': 0.961, 'color': '#38b2ac'},
-                {'name': 'BB/TB (WHZ)', 'key': 'Z-score BB/TB', 'r2': 0.936, 'color': '#ed8936'}
-            ],
+            'targets_info': targets_info,
             'scatter': scatter_data,
             'feature_importance': feature_importance,
             'outlier_distribution': outlier_distribution,

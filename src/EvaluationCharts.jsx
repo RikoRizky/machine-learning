@@ -95,15 +95,20 @@ const generateFallbackScatter = () => {
 
 const DEFAULT_EVAL_DATA = {
   metrics: {
-    mean_r2: 0.9552,
-    rmse: 0.2230,
-    mae: 0.1360,
+    mean_r2: 0.9473,
+    rmse: 1.0991,
+    mae: 0.0463,
   },
+  targets_info: [
+    { name: 'BB/U (WAZ)', key: 'Z-score BB/U', r2: 0.987, color: '#4a90e2' },
+    { name: 'TB/U (HAZ)', key: 'Z-score TB/U', r2: 0.993, color: '#38b2ac' },
+    { name: 'BB/TB (WHZ)', key: 'Z-score BB/TB', r2: 0.862, color: '#ed8936' },
+  ],
   scatter: generateFallbackScatter(),
   feature_importance: {
-    features: ['Jenis Kelamin (jk)', 'Umur Bulan (umur)', 'Berat Badan (bb)', 'Tinggi Badan (tb)'],
-    importances: [0.046, 0.174, 0.368, 0.412],
-    colors: ['#718096', '#0e7490', '#1d70b8', '#102a43'],
+    features: ['Jenis Kelamin (jk)', 'Berat Badan (bb)', 'Tinggi Badan (tb)', 'Umur Bulan (umur)'],
+    importances: [0.0374, 0.1926, 0.3623, 0.4078],
+    colors: ['#718096', '#1d70b8', '#102a43', '#0e7490'],
   },
   outlier_distribution: {
     total: 40071,
@@ -137,6 +142,7 @@ const EvaluationCharts = () => {
 
           setEvalData({
             metrics: d.metrics || DEFAULT_EVAL_DATA.metrics,
+            targets_info: d.targets_info || DEFAULT_EVAL_DATA.targets_info,
             scatter: d.scatter || DEFAULT_EVAL_DATA.scatter,
             feature_importance: {
               features: paired.map((p) => p.name),
@@ -153,43 +159,23 @@ const EvaluationCharts = () => {
       });
   }, []);
 
-  const { metrics, scatter, feature_importance, outlier_distribution, chart_image } = evalData;
+  const { metrics, scatter, feature_importance, outlier_distribution, chart_image, targets_info } = evalData;
+
+  const currentTargets = targets_info || DEFAULT_EVAL_DATA.targets_info;
 
   // ===== PANEL A: SCATTER AKTUAL VS PREDIKSI =====
   const scatterDatasets = [
-    {
-      label: 'BB/U (WAZ) - R²=0.968',
-      data: (scatter['BB/U (WAZ)']?.actual || []).map((act, i) => ({
+    ...currentTargets.map((t) => ({
+      label: `${t.name} - R²=${t.r2 != null ? Number(t.r2).toFixed(3) : ''}`,
+      data: (scatter[t.name]?.actual || []).map((act, i) => ({
         x: act,
-        y: scatter['BB/U (WAZ)'].predicted[i],
+        y: scatter[t.name]?.predicted?.[i] ?? act,
       })),
-      backgroundColor: 'rgba(74, 144, 226, 0.6)',
-      borderColor: '#4a90e2',
+      backgroundColor: `${t.color || '#4a90e2'}99`,
+      borderColor: t.color || '#4a90e2',
       pointRadius: 3,
       pointHoverRadius: 6,
-    },
-    {
-      label: 'TB/U (HAZ) - R²=0.961',
-      data: (scatter['TB/U (HAZ)']?.actual || []).map((act, i) => ({
-        x: act,
-        y: scatter['TB/U (HAZ)'].predicted[i],
-      })),
-      backgroundColor: 'rgba(56, 178, 172, 0.6)',
-      borderColor: '#38b2ac',
-      pointRadius: 3,
-      pointHoverRadius: 6,
-    },
-    {
-      label: 'BB/TB (WHZ) - R²=0.936',
-      data: (scatter['BB/TB (WHZ)']?.actual || []).map((act, i) => ({
-        x: act,
-        y: scatter['BB/TB (WHZ)'].predicted[i],
-      })),
-      backgroundColor: 'rgba(237, 137, 54, 0.65)',
-      borderColor: '#ed8936',
-      pointRadius: 3,
-      pointHoverRadius: 6,
-    },
+    })),
     {
       type: 'line',
       label: 'Garis Ideal (y = x)',
